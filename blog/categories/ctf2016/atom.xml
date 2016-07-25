@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+
+  <title><![CDATA[Category: Ctf2016 | HarDToBelieve's Blog]]></title>
+  <link href="http://hardtobelieve.github.io/blog/categories/ctf2016/atom.xml" rel="self"/>
+  <link href="http://hardtobelieve.github.io/"/>
+  <updated>2016-07-25T11:34:47+07:00</updated>
+  <id>http://hardtobelieve.github.io/</id>
+  <author>
+    <name><![CDATA[HarDToBelieve]]></name>
+    
+  </author>
+  <generator uri="http://octopress.org/">Octopress</generator>
+
+  
+  <entry>
+    <title type="html"><![CDATA[Bcloud - BCTF 2016]]></title>
+    <link href="http://hardtobelieve.github.io/blog/2016/03/24/bcloud-bctf-2016/"/>
+    <updated>2016-03-24T21:31:51+07:00</updated>
+    <id>http://hardtobelieve.github.io/blog/2016/03/24/bcloud-bctf-2016</id>
+    <content type="html"><![CDATA[<p>Đề bài cho 1 file ELF 32bit</p>
+
+<!--more-->
+
+
+<p>Đầu tiên, ta có thể thấy ở hàm nhập &ldquo;name&rdquo;</p>
+
+<pre><code class="c">int sub_80487A1() {
+    ...
+    sub_804868D(&amp;s, 64, 10);
+    v2 = (char *)malloc(0x40u);
+    dword_804B0CC = (int)v2;
+    strcpy(v2, &amp;s);
+    ...
+}
+</code></pre>
+
+<p>Hàm readn (sub_804868D) tự động thêm null byte, nên sau hàm này ta sẽ có
+<code>latex
+s = 64 byte + null
+</code></p>
+
+<p>Tuy nhiên trên stack lại có cấu trúc</p>
+
+<pre><code class="latex">[char[64] s][char* v2]
+</code></pre>
+
+<p>nên sau khi gọi malloc, thì địa chỉ heap (4 byte) được gán vào v2, đè vào null byte của s, do đó strcpy sẽ copy tổng cộng là (64 byte s + 4 byte  v2), dẫn đến leak được heap.</p>
+
+<p><img src="/assets/bcloud/bcloud1.png" alt="After filling the heap" /></p>
+
+<p>Ở hàm lấy &ldquo;org&rdquo; và &ldquo;host&rdquo;, cũng với lỗi tương tự, nhưng do không có hàm in trả lại chuỗi nên ta không leak được thông tin gì. Tuy nhiên, ta lại có thể viết đè lên meta-data của heap chunk mà xin cấp phát bộ nhớ sau đó. Nhưng tại bước này chỉ có 3 heap đc malloc, vậy vị trí đó chính là size của topchunk</p>
+
+<pre><code class="c">int sub_804884E() {
+    ...
+    puts("Org:");
+    sub_804868D(&amp;s, 64, 10);
+    puts("Host:");
+    sub_804868D(&amp;v3, 64, 10);
+    v4 = (char *)malloc(0x40u);
+    v2 = (char *)malloc(0x40u);
+    dword_804B0C8 = (int)v2;
+    dword_804B148 = (int)v4;
+    strcpy(v4, (const char *)&amp;v3);
+    strcpy(v2, &amp;s);
+    ...
+}
+</code></pre>
+
+<p>Ta để ý rằng, vì không có null byte kết thúc chuỗi &ldquo;org&rdquo; sẽ bị nối tiếp với chuỗi &ldquo;host&rdquo;, dù chuỗi host chỉ xin cấp phát 0x40 byte</p>
+
+<p><img src="/assets/bcloud/bcloud2.png" alt="Serie of &quot;host&quot; and &quot;org&quot;" /></p>
+
+<p>Đến bước này, ta đã đủ điều kiện để thực hiện House of Force, một cách thức khai thác lỗi được nhắc đến trong Malloc Maleficarum. Ta sẽ khai thác như sau:</p>
+
+<ul>
+<li>Nhập &ldquo;host&rdquo; có giá trị 0xffffffff, như vậy size của topchunk là 0xffffffff</li>
+<li>Tạo một note mới bằng hàm &ldquo;New&rdquo;, kích thước là</li>
+</ul>
+
+
+<pre><code class="latex">địa chỉ got - địa chỉ heap - 0x8 ( metadata của heap )
+</code></pre>
+
+<p>Ở đây ta chọn thay hàm atoi bằng printf để có thể khai thác lỗi format string</p>
+
+<ul>
+<li>Leak địa chỉ libc</li>
+<li>Sử dụng chức năng &ldquo;Edit&rdquo;, sửa nội dung note thứ nhất thành địa chỉ libc + offset_system</li>
+<li>Gửi chuỗi &ldquo;/bin/sh&rdquo; và sẽ nhận được shell</li>
+</ul>
+
+]]></content>
+  </entry>
+  
+</feed>

@@ -1,0 +1,262 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Fastbin Technique - HarDToBelieve's Blog</title>
+  <meta name="author" content="HarDToBelieve">
+
+  
+  <meta name="description" content="Fastbin Technique written in exploitation Ở các bài trước, ta đã nghiên cứu 2 loại chunk đó là small chunk ( được nhắc tới ở bài unlink ) và large &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://hardtobelieve.github.io/blog/2016/06/14/fastbin">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/atom.xml" rel="alternate" title="HarDToBelieve's Blog" type="application/atom+xml">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+  <script>!window.jQuery && document.write(unescape('%3Cscript src="./javascripts/libs/jquery.min.js"%3E%3C/script%3E'))</script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  
+
+</head>
+
+  <body>
+    <a href="/" class="home-icon">
+      <img src="/images/home.png"/>
+    </a>
+
+    <article role="article" class="full-single-article">
+  <div class="container">
+    <div class="row">
+      <div class="col-md-10 col-md-offset-1">
+        <h1>Fastbin Technique</h1>
+        <div class="meta">
+          written 
+
+
+
+
+
+
+
+
+  
+
+
+
+<time datetime="2016-06-14T15:54:55+07:00" pubdate data-updated="true"></time>
+          
+
+in
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/exploitation/'>exploitation</a>
+  
+</span>
+
+
+        </div>
+        <p>Ở các bài trước, ta đã nghiên cứu 2 loại chunk đó là small chunk ( được nhắc tới ở bài <a href="blog/2016/05/15/unlink-technique">unlink</a> ) và large chunk ( sử dụng trong bài <a href="blog/2016/05/15/the-forgotten-chunk">forgotten chunk</a> ). Bài viết này sẽ đề cập đến loại chunk còn lại đó là fast chunk, có cơ chế quản lý khác hoàn toàn.</p>
+
+<!--more-->
+
+
+<h1>Đôi điều về fast chunk</h1>
+
+<p>Chunk có kích thước từ 16 tới 80 bytes được gọi là fast chunk. Khi ta yêu cầu cấp phát kích thước nhỏ hơn 16 bytes, chương trình lấy kích thước là <a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1223">MIN SIZE</a>. Fastbin là một danh sách móc nối đơn ( single linked list ) lưu lại các fast chunk đã bị free. Trong tất cả các loại bin ( fastbin, unsorted bin, small bin, large bin ) thì fastbin có tốc độ cấp phát và giải phóng bộ nhớ nhanh nhất. Các fastbin được glibc lưu vào một mảng <a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L1680">fastbinY</a>, fastbinY[i] là linked-list của các chunk có kích thước 16 * (i+1) bytes</p>
+
+<p>Khi malloc và free một fast chunk, có một số lưu ý nhỏ sau đây</p>
+
+<ul>
+<li>Chính xác thì fastbin được dựng theo kiểu stack ( cài bằng single linked list, cơ chế thêm và xóa chunk tuân theo luật LIFO )</li>
+<li>Ban đầu, fastbin rỗng nên nếu ta yêu cầu malloc fast chunk, smallbin sẽ đc dùng</li>
+<li>Không có cơ chế sát nhập</li>
+<li>Khi fastbin không còn rỗng nữa, glibc sẽ tính toán với hàng loạt các macro để <a href="https://github.com/sploitfun/lsploits/blob/master/glibc/malloc/malloc.c#L3332">tìm đúng bin</a> cần trả lại</li>
+</ul>
+
+
+<h1>Kịch bản ( double free )</h1>
+
+<p>Fastbin technique về cơ bản là kỹ thuật viết đè lên trường fd của fast chunk khi ở trong fastbin để nó trỏ vào vùng nhớ ta quản lý. Để làm được điều này, ta phải có quyền viết vào vùng nhớ đã được free ( heap overflow, double free ). Ở bài viết này, ta sẽ xét lỗi double free</p>
+
+<p>Khi free 1 fast chunk, chunk đó sẽ được đẩy vào stack ( fastbin ) nếu như chunk đó khác với chunk ở đầu stack ( thật thú vị khi glibc không kiểm tra toàn bộ fastbin mà chỉ kiểm tra head chunk, đó là vì <code>performance &gt; secruity</code> ). Như vậy, ta có thể lừa glibc bằng cách đẩy A, rồi đẩy B, rồi tiếp tục đẩy A. Để thấy được sự thú vị đó, ta chạy chương trình sau</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="cp">#include &lt;stdio.h&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="kt">int</span> <span class="nf">main</span> <span class="p">()</span> <span class="p">{</span>
+</span><span class='line'>  <span class="kt">char</span> <span class="o">*</span><span class="n">a</span> <span class="o">=</span> <span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="p">)</span><span class="n">malloc</span><span class="p">(</span><span class="mi">8</span><span class="p">);</span>
+</span><span class='line'>  <span class="kt">char</span> <span class="o">*</span><span class="n">b</span> <span class="o">=</span> <span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="p">)</span><span class="n">malloc</span><span class="p">(</span><span class="mi">8</span><span class="p">);</span>
+</span><span class='line'>  <span class="kt">char</span> <span class="o">*</span><span class="n">c</span> <span class="o">=</span> <span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="p">)</span><span class="n">malloc</span><span class="p">(</span><span class="mi">8</span><span class="p">);</span>
+</span><span class='line'>  <span class="n">free</span><span class="p">(</span><span class="n">a</span><span class="p">);</span>
+</span><span class='line'>  <span class="n">free</span><span class="p">(</span><span class="n">b</span><span class="p">);</span>
+</span><span class='line'>  <span class="n">free</span><span class="p">(</span><span class="n">a</span><span class="p">);</span>
+</span><span class='line'>  <span class="n">printf</span> <span class="p">(</span><span class="s">&quot;1st malloc: %p</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">malloc</span><span class="p">(</span><span class="mi">8</span><span class="p">));</span>
+</span><span class='line'>  <span class="n">printf</span> <span class="p">(</span><span class="s">&quot;2nd malloc: %p</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">malloc</span><span class="p">(</span><span class="mi">8</span><span class="p">));</span>
+</span><span class='line'>  <span class="n">printf</span> <span class="p">(</span><span class="s">&quot;3rd malloc: %p</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span> <span class="n">malloc</span><span class="p">(</span><span class="mi">8</span><span class="p">));</span>
+</span><span class='line'>  <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Ta sẽ có lần malloc thứ nhất và thứ ba đều trả về cùng 1 giá trị</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class='latex'><span class='line'>1st malloc: 0x602010
+</span><span class='line'>2nd malloc: 0x602030
+</span><span class='line'>3rd malloc: 0x602010
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Nhờ vào lỗi này, mà sau 2 lần malloc đầu, ta sẽ có chắc chắn có quyền viết vào vùng nhớ của <code>1st malloc</code>, mặc dù đó đang nằm trong fastbin. Tiếp theo, ta sẽ sửa trường fd của chunk này sao cho nó trỏ đến vùng nhớ ta quản lý. Để làm được điều này, ta sẽ phải bypass qua bước check của glibc như sau</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="k">if</span> <span class="p">((</span><span class="kt">unsigned</span> <span class="kt">long</span><span class="p">)</span> <span class="p">(</span><span class="n">nb</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="p">(</span><span class="kt">unsigned</span> <span class="kt">long</span><span class="p">)</span> <span class="p">(</span><span class="n">get_max_fast</span> <span class="p">()))</span>
+</span><span class='line'>    <span class="p">{</span>
+</span><span class='line'>      <span class="n">idx</span> <span class="o">=</span> <span class="n">fastbin_index</span> <span class="p">(</span><span class="n">nb</span><span class="p">);</span>
+</span><span class='line'>      <span class="n">mfastbinptr</span> <span class="o">*</span><span class="n">fb</span> <span class="o">=</span> <span class="o">&amp;</span><span class="n">fastbin</span> <span class="p">(</span><span class="n">av</span><span class="p">,</span> <span class="n">idx</span><span class="p">);</span>
+</span><span class='line'>      <span class="n">mchunkptr</span> <span class="n">pp</span> <span class="o">=</span> <span class="o">*</span><span class="n">fb</span><span class="p">;</span>
+</span><span class='line'>      <span class="k">do</span>
+</span><span class='line'>        <span class="p">{</span>
+</span><span class='line'>          <span class="n">victim</span> <span class="o">=</span> <span class="n">pp</span><span class="p">;</span>
+</span><span class='line'>          <span class="k">if</span> <span class="p">(</span><span class="n">victim</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span>
+</span><span class='line'>            <span class="k">break</span><span class="p">;</span>
+</span><span class='line'>        <span class="p">}</span>
+</span><span class='line'>      <span class="k">while</span> <span class="p">((</span><span class="n">pp</span> <span class="o">=</span> <span class="n">catomic_compare_and_exchange_val_acq</span> <span class="p">(</span><span class="n">fb</span><span class="p">,</span> <span class="n">victim</span><span class="o">-&gt;</span><span class="n">fd</span><span class="p">,</span> <span class="n">victim</span><span class="p">))</span>
+</span><span class='line'>             <span class="o">!=</span> <span class="n">victim</span><span class="p">);</span>
+</span><span class='line'>      <span class="k">if</span> <span class="p">(</span><span class="n">victim</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">)</span>
+</span><span class='line'>        <span class="p">{</span>
+</span><span class='line'>          <span class="k">if</span> <span class="p">(</span><span class="n">__builtin_expect</span> <span class="p">(</span><span class="n">fastbin_index</span> <span class="p">(</span><span class="n">chunksize</span> <span class="p">(</span><span class="n">victim</span><span class="p">))</span> <span class="o">!=</span> <span class="n">idx</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+</span><span class='line'>            <span class="p">{</span>
+</span><span class='line'>              <span class="n">errstr</span> <span class="o">=</span> <span class="s">&quot;malloc(): memory corruption (fast)&quot;</span><span class="p">;</span>
+</span><span class='line'>            <span class="nl">errout</span><span class="p">:</span>
+</span><span class='line'>              <span class="n">malloc_printerr</span> <span class="p">(</span><span class="n">check_action</span><span class="p">,</span> <span class="n">errstr</span><span class="p">,</span> <span class="n">chunk2mem</span> <span class="p">(</span><span class="n">victim</span><span class="p">));</span>
+</span><span class='line'>              <span class="k">return</span> <span class="nb">NULL</span><span class="p">;</span>
+</span><span class='line'>            <span class="p">}</span>
+</span><span class='line'>          <span class="n">check_remalloced_chunk</span> <span class="p">(</span><span class="n">av</span><span class="p">,</span> <span class="n">victim</span><span class="p">,</span> <span class="n">nb</span><span class="p">);</span>
+</span><span class='line'>          <span class="kt">void</span> <span class="o">*</span><span class="n">p</span> <span class="o">=</span> <span class="n">chunk2mem</span> <span class="p">(</span><span class="n">victim</span><span class="p">);</span>
+</span><span class='line'>          <span class="n">alloc_perturb</span> <span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">bytes</span><span class="p">);</span>
+</span><span class='line'>          <span class="k">return</span> <span class="n">p</span><span class="p">;</span>
+</span><span class='line'>        <span class="p">}</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Về cơ bản, glibc chỉ check <code>fastbin_index(my_req)</code> và <code>fastbin_index(chunk_size(first_chunk_in_bin))</code> xem có bằng nhau không, nếu có thì sẽ trả lại chunk đầu tiên ở fastbin. Ta chỉ việc copy các macro mà glibc đã define bên trên, rồi chạy thì ta sẽ biết được kích thước mà ta gán có đúng hay không. Bạn đọc có thể tham khảo chương trình C <a href="https://gist.github.com/HarDToBelieve/bd9dbd40f3572c4bed09d966533fd053">sau</a> ( các bản có thể uncomment và comment tùy thuộc vào hệ điều hành và nơi bạn muốn ghi )</p>
+
+<h1>Nhật xét</h1>
+
+<p>Đây là một kỹ thuật khá hay, có thể kết hợp với nhiều kỹ thuật khác ( bạn đọc có thể thử kết hợp với forgotten chunk ). Tuy nhiên nhược điểm ở phương pháp này là ta cần phải biết địa chỉ ta trỏ tới, và địa chỉ đó phải có quyền ghi thì ta mới tạo được 1 chunk giả ở đó</p>
+
+
+        <hr class="divider-short"/>
+
+        
+      </div>
+    </div>
+  </div>
+</article>
+
+<hr class="divider-short"/>
+
+<div class="archive-link">
+  <div class="container">
+    <div class="row">
+      <div class="col-md-8 col-md-offset-2">
+        
+          <a class="pull-left" href="/blog/2016/05/15/the-forgotten-chunk/" title="Previous Post: The Forgotten Chunk">&laquo; Previous: The Forgotten Chunk</a>
+        
+
+        
+      </div>
+    </div>
+  </div>
+</div>
+
+    <footer id="footer" class="her-row">
+  <div class="container">
+    <div class="row">
+      <div class="col-md-1">
+  <a href="/"><h4>Home</h4></a>
+</div>
+
+<div class="col-md-2">
+  <div class="social-icon-list">
+    
+
+    
+
+    
+
+    
+  </div>
+</div>
+
+<div class="pull-right">
+  <h4>Powered by <a href="http://octopress.org/">Octopress</a>. Designed by <a href="http://AdrianArtiles.com">Adrian Artiles</a>.</h4>
+</div>
+
+
+    </div>
+  </div>
+</footer>
+
+    
+  </body>
+</html>

