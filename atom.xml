@@ -4,7 +4,7 @@
   <title><![CDATA[HarDToBelieve's Blog]]></title>
   <link href="http://hardtobelieve.github.io/atom.xml" rel="self"/>
   <link href="http://hardtobelieve.github.io/"/>
-  <updated>2016-08-08T10:18:20+07:00</updated>
+  <updated>2016-08-27T23:59:07+07:00</updated>
   <id>http://hardtobelieve.github.io/</id>
   <author>
     <name><![CDATA[HarDToBelieve]]></name>
@@ -12,6 +12,70 @@
   </author>
   <generator uri="http://octopress.org/">Octopress</generator>
 
+  
+  <entry>
+    <title type="html"><![CDATA[Singapore - 08/2016 (Phần 2)]]></title>
+    <link href="http://hardtobelieve.github.io/blog/2016/08/26/singapore-fbctf-2/"/>
+    <updated>2016-08-26T20:53:44+07:00</updated>
+    <id>http://hardtobelieve.github.io/blog/2016/08/26/singapore-fbctf-2</id>
+    <content type="html"><![CDATA[<h1>Ngày 3</h1>
+
+<p>Sáng hôm nay hơn 7h tôi mới dậy, nghe kể là chuông kêu inh ỏi mà cả đội chả ai động đậy gì cả. Chắc ai cũng thấm mệt ngày hôm qua cả rồi. Trời trong xanh, mát mẻ, báo hiệu một ngày tốt lành đây.</p>
+
+<!--more-->
+
+
+<p>Buổi sáng, các đội đều cắm cúi cố hoàn thành nốt các bài hôm qua, tôi thì &hellip; ngồi chơi ( tại biết có dán mắt vào thêm nữa cũng chả giải quyết đc ). Đến gần trưa thì ban tổ chức đưa ra 1 bài crypto và 1 bài pwn. Vốn đã ngán mấy bài pwn của kỳ thi này rồi, tôi quyết định làm một điều chưa bao giờ làm: Suy nghĩ và tìm cách giải 1 bài cryptography. Cũng may, bài tôi làm cũng không khó lắm ( sử dụng factordb, quay lui thần thánh ). Làm mảng này cũng vui phết, chắc sau lần này sẽ thử tìm hiểu, nghiên cứu sâu về nó. Xếp hạng 11, quả này căng, đội đang nằm ngoài mục tiêu của đoàn đặt ra rồi. Tôi quay lại cố gắng tìm cách giải 2 bài pwn mới được mở ( điểm cũng không cao nên khả năng đó là bài dễ ). Sau gần 3 tiếng cãi nhau với anh phieulang93 vì một lý do khá ngớ ngẩn - tôi nhìn nhầm, đội đã bứt tốc thành công và lọt vào top 10 chung cuộc. Thôi thế là cũng ổn rồi.</p>
+
+<p>Buổi tối, các đội từ Việt Nam đi ăn và đi chơi cùng với các anh Mạnh Luật, K9, &hellip; nhưng tôi chọn ở nhà. Ngồi một lúc thì thầy cũng qua nói chuyện và dù nhận được nhiều lời mời hay lúc sau là một bức email tôi đang chờ đợi thì tôi vẫn thấy bất an. Gọi điện cho bố mẹ là việc tôi cần phải làm. Đúng như những gì tôi cảm nhận, một tin buồn trong họ hàng nhà tôi &hellip;</p>
+
+<h1>Ngày 4</h1>
+
+<p>Buồn chán nọ chồng chất lên buồn chán kia, 9h sáng tôi mới vật vã dậy đánh răng rửa mặt. Không để thế này được, tôi quyết định nhấc mông lên và đi.</p>
+
+<p>Cả đội và thầy cùng đi đến Marina Bay Sands, gặp anh tungpwn ở điểm ra Mass Rapid Transit (MRT). Anh dẫn cả đoàn đi xung quanh toà nhà có con thuyền trên nóc này, rồi chụp ảnh ở OCBC Skyway. Trời thoáng và mát, mọi người đều tranh thủ chụp ảnh trên những cột tháp ( nghe anh tungpwn kể rằng các cột này tạo thành hình dáng 1 người ôm 2 người còn lại, tôi thì chịu, chả nhìn ra gì cả ). Rồi tất cả lại di chuyển qua ArtScience Museum ( đang có triển lãm về kiến trúc ), qua Merlion Park ( chụp ảnh cùng bức tượng đầu sư tử mình cá ). Thầy trưởng đoàn cũng mệt nhoài vì chúng tôi đi bộ rất nhiều do lạc đường, nên mọi người quyết định về nghỉ ngơi.</p>
+
+<p>Nhưng tôi vẫn chưa muốn về, dù lưng và chân mỏi nhừ. Tôi tiếp tục đi loanh quanh Singapore bằng tàu điện ngầm. Tôi băng qua con phố Orchard, một khu phố rất sầm uất: trung tâm thương mại mọc lên như nấm, ai ai cũng xách trên tay các đồ hàng hiệu. Tôi đi vào cửa hàng Samsung thử kính VR, một lúc lâu sau vẫn còn cảm thấy chóng mặt. Tôi tạt vào cửa hàng quần áo, thử vài bộ chơi, thử xịt chút nước hoa. Có cái kính tôi thấy chả khác gì cái kính mà ở nơi bán kính cận hay dùng để đo độ cho khách hàng, vậy mà giá cũng lên tới 50 SGD <img src="http://hardtobelieve.github.io/assets/singapore-082016/oh.png" height="36" width="36" alt="oh" />. Đi dọc con phố thì gặp các nghệ sỹ đường phố: họ chơi guitar, violon, beatbox hay cũng có người biểu diễn tung hứng. Tôi rất thích xem những màn trình diễn này, mộc mạc mà vẫn tinh tế. Có một điều tôi thấy khá thú vị ở nơi đây đó là bạn cứ đâm đầu vào trung tâm thương mại là chắc chắn sẽ có trạm mrt ở tầng dưới cùng, và từ đó thì bạn sẽ chả bao giờ bị lạc cả. Tôi chọn tuyến đường đi đến trường đại học NUS để thăm cặp Song Đạt. Ba anh em đi một vòng quanh trường ( rộng kinh khủng ) rồi đi ăn món Thái ở một quán Ấn (?!). Cuộc sống du học sinh bên này vui nhưng cũng không ít khó khăn. Tạm biệt 2 anh, tôi lại bắt chuyến tàu quay lại gần nhà anh tungpwn, rồi hai anh em lại lên đường đến chỗ làm của anh ý - Garena. Quả không hổ danh là một công ty lớn, họ bố trí không gian thư giãn cũng như làm việc rất hợp lý. Tôi đã bị anh &ldquo;hấp diêm&rdquo; trong trò bi lắc ( chơi một người một đội khó quá, không tài nào kịp nhanh để điều khiển nổi thủ môn <img src="http://hardtobelieve.github.io/assets/singapore-082016/too_sad.png" height="36" width="36" alt="sad" /> ). Tham quan Garena một lúc thì cũng đã muộn, tôi chào anh và hẹn dịp khác sẽ gặp lại. Bố mẹ mà biết đã gần 11h đêm rồi mà thằng con trai vẫn đang lang thang một mình ở các trạm tàu điện ngầm nơi đất khách quê người, bắt những chuyến tàu cuối cùng trong ngày để về khách sạn thì chắc sẽ mắng tôi một trận mất.</p>
+
+<p>Kết thúc chuyến đi du đấu đầu tiên, vui có mà buồn cũng không ít. Nhưng tôi cũng đã có được nhiều bài học cho riêng mình. Hy vọng tôi sẽ có nhiều dịp đi nước ngoài hơn nữa, đặc biệt là châu Âu - ước mơ từ lâu của tôi ( cho dù có lẽ giờ mục đích đi châu Âu của tôi khác với thời điểm này 1 năm trước rồi ).</p>
+
+<p>Tạm biệt nơi đây, hẹn ngày tái ngộ<br/>
+Singapore, tháng 8 năm 2016</p>
+]]></content>
+  </entry>
+  
+  <entry>
+    <title type="html"><![CDATA[Singapore - 08/2016]]></title>
+    <link href="http://hardtobelieve.github.io/blog/2016/08/24/singapore-fbctf/"/>
+    <updated>2016-08-24T19:16:55+07:00</updated>
+    <id>http://hardtobelieve.github.io/blog/2016/08/24/singapore-fbctf</id>
+    <content type="html"><![CDATA[<h1>Ngày 1</h1>
+
+<p><strong><em> Deep là ko đc </em></strong><br/>
+<strong><em> Deep là ko tốt </em></strong><br/>
+<strong><em> Ko nên deep </em></strong><br/>
+<strong><em> Muốn chữa deep phải nghe nhạc Big Bang </em></strong></p>
+
+<!--more-->
+
+
+<p>Đã thử nhưng cũng chả tác dụng mấy, có lẽ một phần vì không gian giống 1 năm trước quá, chỉ có điều giờ không có đánh bài uno hay ai đó để trêu thôi&hellip; Lần đầu được đi máy bay hạng sang ( chiếu phim, nghe nhạc ) cảm giác như doanh nhân vậy, chỉ có điều hôm nay mấy lần được bay vòng số 8 rồi. Vào đến nam thì gặp mọi người, đội lần này đi tham dự có thể nói là một liên quân: thành viên có đủ bắc trung nam, hy vọng sẽ làm được điều gì đó bất ngờ.</p>
+
+<p>Chỗ ở giống nhà nghỉ hơn là khách sạn, nằm ở giữa khu của người Ấn thì phải. 4 anh em chui vào 1 cái phòng bé tí, được cái quang cảnh xung quanh cũng ổn. Mọi người chắc đều bị jetlag ( khát nước nữa, đồ ăn ở đây làm tôi thèm nước lọc kinh khủng ) nên cũng mệt mỏi, chưa đi đâu chơi nhiều. Kết thúc ngày bằng việc anh phieulang93 bật nhạc vàng ( chắc để đuổi tôi ra chỗ khác nằm đây mà, hiệu quả đấy <img src="http://hardtobelieve.github.io/assets/singapore-082016/too_sad.png" height="36" width="36" alt="sad" /> ). Omfg &hellip;</p>
+
+<p>Nhân tiện, tôi đã hoàn thành cuốn <code>Từng qua tuổi 20</code>. Một cuốn truyện khá hay và hài hước, kể về 1 anh chàng người Anh có những ngày tệ hại đầu năm, nhưng cuối cùng cũng tìm lại được mục đích sống và những ngày tháng hạnh phúc vui vẻ.</p>
+
+<h1>Ngày 2</h1>
+
+<p>Cả phòng thức dậy nhờ nhạc chuông của anh phieulang93: &ldquo;Cô dạy em, bài thể dục buổi sáng, 1 2 3 hít thở hít thở hít thở&rdquo;, và lúc đó hình như là 5h sáng ( chúng tôi ở tầng 8 của khu nhà nghỉ mà vẫn còn chưa thấy tí ánh sáng nào <img src="http://hardtobelieve.github.io/assets/singapore-082016/beat-brick.png" height="36" width="36" alt="beat brick" /> ). 4 anh em quyết định ngồi trên phòng ăn gói mỳ thay vì đi xuống ăn đồ ăn sáng, lúc sau xuống xem thử họ nấu gì mới biết lựa chọn kia là hoàn toàn chính xác.</p>
+
+<p>9h sáng tôi đặt chân đến nơi tổ chức kỳ thi/hội thảo về Security - Khách sạn 5 sao Intercontinental. Mọi thứ hoành tráng thật! Ngoài hành lang có đồ ăn nước uống khá đầy đủ, phòng thi cũng rộng rãi, duy chỉ có hạ tầng mạng internet là bi kịch. Đội tôi khởi đầu khá tốt với bài Pwn100 - heap, user after free - đúng sở trường của tôi rồi. Nhưng hơi tiếc vì làm xong sớm nhưng mạng tồi không tài nào submit đáp án nổi. Bài thứ 2 là For600, điểm số khủng khiếp nhưng cách giải lại rất &hellip; tào lao, kết cục của bài này vẫn giống bài trước, làm xong nhưng cũng phải đợi gần 2 tiếng đồng hồ mới có thể gửi và lấy điểm về được. Các bài pwnable còn lại có vẻ hơi dài, thường thì tôi sẽ ngồi làm cùng anh yeuchimse, hai anh em, người dựng struct người tìm hiểu chương trình làm gì. Nhưng hôm nay không có anh ở đây nên mình tôi làm cũng ngại quá. Chuyến đi lần này cũng được gặp nhiều idol: anh aquynh, thanh niên người Việt chơi ở team đứng đầu thế giới ( dcua ), hotgirl làm rung chuyển cộng đồng hacker Việt năm ngoái ( trông có vẻ giống ), &hellip; Anh Quỳnh hỏi tôi học Bách Khoa Hà Nội à, tôi hy vọng ảnh hôm nào đó sẽ qua trường tôi chơi, <img src="http://hardtobelieve.github.io/assets/singapore-082016/beauty.png" height="36" width="36" alt="beauty" /></p>
+
+<p>9 tiếng thi đấu cũng kéo theo lượng caffein trong đầu tôi đi một cách nhanh chóng. Mệt! Đi tàu điện ngầm giờ cao điểm ở Sing cũng có vẻ không khác đi xe bus ở Việt Nam là mấy, cũng may là mọi người đều trật tự xếp hàng lên xuống tàu nên cũng thoải mái hơn. Về đến nhà tôi phải ngủ một lúc thì mới dậy tắm và đi ăn được. Giờ thử cố gắng xử lý nốt mấy bài hồi sáng rồi đi ngủ thôi nào &hellip;</p>
+
+<p><a href="../../26/singapore-fbctf-2">Còn tiếp</a></p>
+]]></content>
+  </entry>
   
   <entry>
     <title type="html"><![CDATA[Ràng Buộc ...]]></title>

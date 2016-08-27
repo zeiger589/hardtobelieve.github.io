@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd" xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 <url>
+<loc>http://hardtobelieve.github.io/blog/2016/08/26/singapore-fbctf-2/</loc>
+<lastmod>2016-08-26T20:53:44+07:00</lastmod>
+</url>
+<url>
+<loc>http://hardtobelieve.github.io/blog/2016/08/24/singapore-fbctf/</loc>
+<lastmod>2016-08-24T19:16:55+07:00</lastmod>
+</url>
+<url>
 <loc>http://hardtobelieve.github.io/blog/2016/08/07/constraint/</loc>
 <lastmod>2016-08-07T16:35:08+07:00</lastmod>
 </url>
@@ -42,5 +50,8 @@
 </url>
 <url>
 <loc>http://hardtobelieve.github.io/blog/categories/dailylife/</loc>
+</url>
+<url>
+<loc>http://hardtobelieve.github.io/blog/categories/ctf/</loc>
 </url>
 </urlset>
